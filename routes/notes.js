@@ -1,53 +1,51 @@
-
 const express = require('express');
 const notesRouter = express.Router();
 const { readFromFile, readAndAppend, writeToFile } = require('../helpers/fsUtils');
 const generateUuid = require('../helpers/uuid');
 
-
-notesRouter.get('/', (req, res) => {
-  readFromFile('./db/db.json')
-    .then((notesData) => res.json(JSON.parse(notesData)))
-    .catch((err) => res.status(500).json({ error: 'Failed to read notes' }));
-});
-
-
-notesRouter.post('/', (req, res) => {
-  const { title, text } = req.body;
-
-  if (title && text) {
-    const newNote = {
-      title,
-      text,
-      id: generateUuid(),
-    };
-
-    readAndAppend(newNote, './db/db.json')
-      .then(() => res.json('Note added successfully'))
-      .catch((err) => res.status(500).json({ error: 'Failed to add note' }));
-  } else {
-    res.status(400).json({ error: 'Note title and text are required' });
+// GET all notes
+notesRouter.get('/', async (req, res) => {
+  try {
+    const notesData = await readFromFile('./db/db.json');
+    res.json(notesData);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read notes', details: err.message });
   }
 });
 
+// POST a new note
+notesRouter.post('/', async (req, res) => {
+  const { title, text } = req.body;
+  if (!title || !text) {
+    return res.status(400).json({ error: 'Note title and text are required' });
+  }
+  
+  const newNote = { title, text, id: generateUuid() };
+  
+  try {
+    await readAndAppend(newNote, './db/db.json');
+    res.json({ message: 'Note added successfully', note: newNote });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add note', details: err.message });
+  }
+});
 
-notesRouter.delete('/:id', (req, res) => {
+// DELETE a note by ID
+notesRouter.delete('/:id', async (req, res) => {
   const noteIdToDelete = req.params.id;
-
-  readFromFile('./db/db.json')
-    .then((notesData) => {
-      const existingNotes = JSON.parse(notesData);
-      const updatedNotes = existingNotes.filter((note) => note.id !== noteIdToDelete);
-
-      if (existingNotes.length === updatedNotes.length) {
-        res.status(404).json({ error: 'Note not found' });
-      } else {
-        writeToFile('./db/db.json', updatedNotes)
-          .then(() => res.json('Note deleted successfully'))
-          .catch((err) => res.status(500).json({ error: 'Failed to delete note' }));
-      }
-    })
-    .catch((err) => res.status(500).json({ error: 'Failed to read notes' }));
+  try {
+    const notesData = await readFromFile('./db/db.json');
+    const updatedNotes = notesData.filter(note => note.id !== noteIdToDelete);
+    
+    if (notesData.length === updatedNotes.length) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+    
+    await writeToFile('./db/db.json', updatedNotes);
+    res.json({ message: 'Note deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to process notes', details: err.message });
+  }
 });
 
 module.exports = notesRouter;
