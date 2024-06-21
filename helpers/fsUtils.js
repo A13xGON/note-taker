@@ -1,36 +1,37 @@
-const fs = require('fs');
-const util = require('util');
+const fs = require('fs/promises');
 
-// Promise version of fs.readFile
-const readFromFile = util.promisify(fs.readFile);
 
-/**
- *  Function to write data to the JSON file given a destination and some content
- *  @param {string} filePath The file you want to write to.
- *  @param {object} data The content you want to write to the file.
- *  @returns {void} Nothing
- */
-const writeToFile = (filePath, data) =>
-  fs.writeFile(filePath, JSON.stringify(data, null, 4), (err) =>
-    err ? console.error(err) : console.info(`\nData written to ${filePath}`)
-  );
-
-/**
- *  Function to read data from a given file and append some content
- *  @param {object} newData The content you want to append to the file.
- *  @param {string} filePath The path to the file you want to save to.
- *  @returns {void} Nothing
- */
-const readAndAppend = (newData, filePath) => {
-  fs.readFile(filePath, 'utf8', (err, fileData) => {
-    if (err) {
-      console.error(err);
-    } else {
-      const parsedData = JSON.parse(fileData);
-      parsedData.push(newData);
-      writeToFile(filePath, parsedData);
+async function readFromFile(filePath) {
+    try {
+        const data = await fs.readFile(filePath, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error reading from file:', error);
+        throw error; // Rethrow to handle the error in calling functions
     }
-  });
-};
+}
+
+
+async function writeToFile(filePath, data) {
+    try {
+        await fs.writeFile(filePath, JSON.stringify(data, null, 4));
+        console.info(`Data written to ${filePath}`);
+    } catch (error) {
+        console.error('Error writing to file:', error);
+        throw error;
+    }
+}
+
+
+async function readAndAppend(newData, filePath) {
+    try {
+        const fileData = await readFromFile(filePath);
+        fileData.push(newData);
+        await writeToFile(filePath, fileData);
+    } catch (error) {
+        console.error('Error appending to file:', error);
+        throw error;
+    }
+}
 
 module.exports = { readFromFile, writeToFile, readAndAppend };
